@@ -1,142 +1,7 @@
-const { Plugin, PluginSettingTab, Setting, Notice, Modal, MarkdownView, TFile, TFolder, Platform, setIcon } = require("obsidian");
-const obsidian = require("obsidian");
+const { Plugin, PluginSettingTab, Setting, SecretComponent, Notice, Modal, MarkdownView, TFile, TFolder, Platform, setIcon } = require("obsidian");
 
-const STRINGS = {
-  en: {
-    "title": "Claude Code",
-    "cmd.open": "Open Claude Code",
-    "cmd.new": "Start a new Claude Code session",
-    "cmd.askNote": "Ask Claude about this note",
-    "cmd.askSelection": "Ask Claude about the selection",
-    "menu.askNote": "Ask Claude about this note",
-    "menu.askSelection": "Ask Claude about the selection",
-    "menu.askFile": "Ask Claude about this file",
-    "menu.askFolder": "Ask Claude about this folder",
-    "ref.lines": "lines {from}-{to}",
-    "ref.line": "line {from}",
-    "notice.needsTerminal": "ecu-claude needs the ecu-terminal plugin (2.4 or newer). Install and enable it, then try again.",
-    "notice.oldTerminal": "ecu-claude needs ecu-terminal 2.4 or newer. Update ecu-terminal and reload Obsidian.",
-    "notice.sendFailed": "Couldn't reach the Claude Code pane.",
-    "notice.noFile": "Open a note first.",
-    "notice.busy": "Claude is waiting for an answer in its pane, so nothing was typed. The reference is on the clipboard; paste it when Claude is ready.",
-    "cmd.prepare": "Prepare this vault for Claude Code",
-    "prepare.done": "Created {files}.",
-    "prepare.skipped": "Already there, left as is: {files}.",
-    "prepare.failed": "Couldn't write {file}: {error}",
-    "set.prepare": "Prepare the vault",
-    "set.prepareDesc": "Adds a CLAUDE.md with the vault's conventions (wikilinks, frontmatter, code blocks) and a rule that stops Claude from editing .obsidian. Existing files are never overwritten.",
-    "set.prepareBtn": "Prepare",
-    "install.title": "Claude Code isn't installed",
-    "install.text": "ecu-claude starts the `{cmd}` command in a terminal, but it wasn't found on this computer. Install Claude Code, sign in once by running `claude` in a terminal, then click Open again.",
-    "install.mac": "macOS, Linux, WSL",
-    "install.win": "Windows (PowerShell)",
-    "install.npm": "With npm",
-    "install.docs": "Installation guide",
-    "install.anyway": "Open anyway",
-    "install.copy": "Copy",
-    "install.copied": "Copied",
-    "set.lang": "Language",
-    "set.langDesc": "Language of the commands and settings.",
-    "set.langAuto": "Same as the app",
-    "set.command": "Claude command",
-    "set.commandDesc": "The command that starts Claude Code. Use a full path if it isn't on your PATH.",
-    "set.args": "Extra arguments",
-    "set.argsDesc": "Added after the command, for example --model sonnet.",
-    "set.place": "Open in",
-    "set.placeDesc": "Where the Claude Code pane opens.",
-    "set.placeRight": "A split on the right",
-    "set.placeBottom": "A split below",
-    "set.placeTab": "A new tab",
-    "set.folder": "Working folder",
-    "set.folderDesc": "The folder Claude Code starts in. Claude can read and edit files inside it.",
-    "set.folderVault": "The vault",
-    "set.folderNote": "The current note's folder",
-    "set.resume": "Continue the last conversation",
-    "set.resumeDesc": "After Obsidian restarts, reopen the pane with claude --continue instead of a fresh session.",
-    "set.ribbon": "Ribbon icon",
-    "set.ribbonDesc": "Show a button in the left ribbon that opens Claude Code.",
-    "set.check": "Check installation",
-    "set.checkDesc": "Look for the Claude command on this computer.",
-    "set.checkBtn": "Check",
-    "set.found": "Found: {path}",
-    "set.notFound": "Not found. See the installation guide.",
-  },
-  tr: {
-    "title": "Claude Code",
-    "cmd.open": "Claude Code'u aç",
-    "cmd.new": "Yeni Claude Code oturumu başlat",
-    "cmd.askNote": "Bu notu Claude'a sor",
-    "cmd.askSelection": "Seçimi Claude'a sor",
-    "menu.askNote": "Bu notu Claude'a sor",
-    "menu.askSelection": "Seçimi Claude'a sor",
-    "menu.askFile": "Bu dosyayı Claude'a sor",
-    "menu.askFolder": "Bu klasörü Claude'a sor",
-    "ref.lines": "{from}-{to}. satırlar",
-    "ref.line": "{from}. satır",
-    "notice.needsTerminal": "ecu-claude için ecu-terminal eklentisi (2.4 ya da üstü) gerekiyor. Kurup etkinleştirdikten sonra tekrar dene.",
-    "notice.oldTerminal": "ecu-claude için ecu-terminal 2.4 ya da üstü gerekiyor. ecu-terminal'i güncelleyip Obsidian'ı yeniden yükle.",
-    "notice.sendFailed": "Claude Code bölmesine ulaşılamadı.",
-    "notice.noFile": "Önce bir not aç.",
-    "notice.busy": "Claude bölmesinde bir soruya cevap bekliyor, o yüzden bir şey yazılmadı. Referans panoya kopyalandı; Claude hazır olunca yapıştır.",
-    "cmd.prepare": "Bu kasayı Claude Code'a hazırla",
-    "prepare.done": "Oluşturuldu: {files}.",
-    "prepare.skipped": "Zaten var, dokunulmadı: {files}.",
-    "prepare.failed": "{file} yazılamadı: {error}",
-    "set.prepare": "Kasayı hazırla",
-    "set.prepareDesc": "Kasanın kurallarını (wikilink, frontmatter, kod blokları) anlatan bir CLAUDE.md ve Claude'un .obsidian'ı düzenlemesini engelleyen bir kural ekler. Var olan dosyaların üzerine asla yazmaz.",
-    "set.prepareBtn": "Hazırla",
-    "install.title": "Claude Code kurulu değil",
-    "install.text": "ecu-claude terminalde `{cmd}` komutunu başlatıyor ama bu bilgisayarda bulunamadı. Claude Code'u kur, bir terminalde `claude` çalıştırıp bir kez giriş yap, sonra Aç'a tekrar tıkla.",
-    "install.mac": "macOS, Linux, WSL",
-    "install.win": "Windows (PowerShell)",
-    "install.npm": "npm ile",
-    "install.docs": "Kurulum rehberi",
-    "install.anyway": "Yine de aç",
-    "install.copy": "Kopyala",
-    "install.copied": "Kopyalandı",
-    "set.lang": "Dil",
-    "set.langDesc": "Komutların ve ayarların dili.",
-    "set.langAuto": "Uygulamayla aynı",
-    "set.command": "Claude komutu",
-    "set.commandDesc": "Claude Code'u başlatan komut. PATH'te değilse tam yolunu yaz.",
-    "set.args": "Ek argümanlar",
-    "set.argsDesc": "Komutun sonuna eklenir, örneğin --model sonnet.",
-    "set.place": "Açılacağı yer",
-    "set.placeDesc": "Claude Code bölmesinin açılacağı yer.",
-    "set.placeRight": "Sağda bölünmüş pencere",
-    "set.placeBottom": "Altta bölünmüş pencere",
-    "set.placeTab": "Yeni sekme",
-    "set.folder": "Çalışma klasörü",
-    "set.folderDesc": "Claude Code'un başlayacağı klasör. Claude bu klasördeki dosyaları okuyup düzenleyebilir.",
-    "set.folderVault": "Kasa",
-    "set.folderNote": "Açık notun klasörü",
-    "set.resume": "Son konuşmaya devam et",
-    "set.resumeDesc": "Obsidian yeniden açılınca bölmeyi yeni oturum yerine claude --continue ile aç.",
-    "set.ribbon": "Şerit simgesi",
-    "set.ribbonDesc": "Sol şeritte Claude Code'u açan bir düğme göster.",
-    "set.check": "Kurulumu kontrol et",
-    "set.checkDesc": "Bu bilgisayarda Claude komutunu ara.",
-    "set.checkBtn": "Kontrol et",
-    "set.found": "Bulundu: {path}",
-    "set.notFound": "Bulunamadı. Kurulum rehberine bak.",
-  },
-};
-
-let uiLang = "en";
-function t(key, vars) {
-  const s = (STRINGS[uiLang] && STRINGS[uiLang][key]) || STRINGS.en[key] || key;
-  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m)) : s;
-}
-function resolveUiLang(pref) {
-  if (pref === "en" || pref === "tr") return pref;
-  let code = "";
-  try {
-    code = typeof obsidian.getLanguage === "function" ? obsidian.getLanguage() : obsidian.moment.locale();
-  } catch (e) {
-    code = "";
-  }
-  return /^tr/i.test(code) ? "tr" : "en";
-}
+const { t, resolveUiLang, setUiLang } = require("./i18n");
+const { ChatView, VIEW_CHAT, MODELS } = require("./chat");
 
 const TOOL_ID = "ecu-claude";
 const DOCS_URL = "https://code.claude.com/docs/en/setup";
@@ -162,7 +27,21 @@ const CLAUDE_MD = [
 const CLAUDE_SETTINGS = JSON.stringify({ permissions: { deny: ["Edit(/.obsidian/**)"] } }, null, 2) + "\n";
 const DIALOG_RE = /(Choose the text style|Do you trust|trust the files|Select login method|login method|Press Enter to continue|Do you want to (proceed|make this edit|create|allow|run)|Yes, proceed|Esc to cancel|❯\s*(\d+\.|✔))/i;
 
-const DEFAULTS = { uiLang: "auto", command: "claude", args: "", place: "right", folder: "vault", resume: true, ribbon: true };
+const DEFAULTS = {
+  uiLang: "auto",
+  mode: "cli",
+  command: "claude",
+  args: "",
+  place: "right",
+  folder: "vault",
+  resume: true,
+  ribbon: true,
+  apiKeySecret: "",
+  model: "claude-opus-5-5",
+  effort: "medium",
+  confirm: true,
+};
+const KEYS_URL = "https://platform.claude.com/settings/keys";
 
 function shQuote(s) {
   if (/^[\w@%+=:,./-]+$/.test(s)) return s;
@@ -222,6 +101,11 @@ class ClaudeSettings extends PluginSettingTab {
     const el = this.containerEl;
     const p = this.plugin;
     el.empty();
+    const save = async (key, v, redraw) => {
+      p.settings[key] = v;
+      await p.saveSettings();
+      if (redraw) this.display();
+    };
     new Setting(el)
       .setName(t("set.lang"))
       .setDesc(t("set.langDesc"))
@@ -232,12 +116,74 @@ class ClaudeSettings extends PluginSettingTab {
           .addOption("tr", "Türkçe")
           .setValue(p.settings.uiLang)
           .onChange(async (v) => {
-            p.settings.uiLang = v;
-            uiLang = resolveUiLang(v);
-            await p.saveSettings();
-            this.display();
+            setUiLang(v);
+            await save("uiLang", v, true);
           })
       );
+    new Setting(el)
+      .setName(t("set.ribbon"))
+      .setDesc(t("set.ribbonDesc"))
+      .addToggle((x) =>
+        x.setValue(p.settings.ribbon).onChange(async (v) => {
+          await save("ribbon", v);
+          p.syncRibbon();
+        })
+      );
+    if (Platform.isDesktopApp)
+      new Setting(el)
+        .setName(t("set.mode"))
+        .setDesc(t("set.modeDesc"))
+        .addDropdown((d) =>
+          d
+            .addOption("cli", t("set.modeCli"))
+            .addOption("api", t("set.modeApi"))
+            .setValue(p.settings.mode)
+            .onChange((v) => save("mode", v, true))
+        );
+    if (p.mode() === "api") this.apiSection(el, save);
+    else this.cliSection(el, save);
+  }
+
+  apiSection(el, save) {
+    const p = this.plugin;
+    new Setting(el).setName(t("set.apiHeading")).setHeading();
+    const key = new Setting(el).setName(t("set.apiKey")).setDesc(t("set.apiKeyDesc"));
+    new SecretComponent(this.app, key.controlEl).setValue(p.settings.apiKeySecret || "").onChange(async (v) => {
+      await save("apiKeySecret", v || "");
+      p.refreshChats();
+    });
+    key.descEl.createEl("br");
+    key.descEl.createEl("a", { text: t("set.getKey"), href: KEYS_URL });
+    new Setting(el)
+      .setName(t("set.model"))
+      .setDesc(t("set.modelDesc"))
+      .addDropdown((d) => {
+        for (const m of MODELS) d.addOption(m.id, m.label);
+        d.setValue(p.settings.model).onChange(async (v) => {
+          await save("model", v);
+          p.refreshChats();
+        });
+      });
+    new Setting(el)
+      .setName(t("set.effort"))
+      .setDesc(t("set.effortDesc"))
+      .addDropdown((d) =>
+        d
+          .addOption("low", t("effort.low"))
+          .addOption("medium", t("effort.medium"))
+          .addOption("high", t("effort.high"))
+          .setValue(p.settings.effort)
+          .onChange((v) => save("effort", v))
+      );
+    new Setting(el)
+      .setName(t("set.confirm"))
+      .setDesc(t("set.confirmDesc"))
+      .addToggle((x) => x.setValue(p.settings.confirm).onChange((v) => save("confirm", v)));
+  }
+
+  cliSection(el, save) {
+    const p = this.plugin;
+    new Setting(el).setName(t("set.cliHeading")).setHeading();
     new Setting(el)
       .setName(t("set.command"))
       .setDesc(t("set.commandDesc"))
@@ -246,20 +192,14 @@ class ClaudeSettings extends PluginSettingTab {
           .setPlaceholder("claude")
           .setValue(p.settings.command)
           .onChange(async (v) => {
-            p.settings.command = v.trim() || "claude";
             p.found = null;
-            await p.saveSettings();
+            await save("command", v.trim() || "claude");
           })
       );
     new Setting(el)
       .setName(t("set.args"))
       .setDesc(t("set.argsDesc"))
-      .addText((x) =>
-        x.setValue(p.settings.args).onChange(async (v) => {
-          p.settings.args = v.trim();
-          await p.saveSettings();
-        })
-      );
+      .addText((x) => x.setValue(p.settings.args).onChange((v) => save("args", v.trim())));
     new Setting(el)
       .setName(t("set.place"))
       .setDesc(t("set.placeDesc"))
@@ -269,10 +209,7 @@ class ClaudeSettings extends PluginSettingTab {
           .addOption("bottom", t("set.placeBottom"))
           .addOption("tab", t("set.placeTab"))
           .setValue(p.settings.place)
-          .onChange(async (v) => {
-            p.settings.place = v;
-            await p.saveSettings();
-          })
+          .onChange((v) => save("place", v))
       );
     new Setting(el)
       .setName(t("set.folder"))
@@ -282,30 +219,12 @@ class ClaudeSettings extends PluginSettingTab {
           .addOption("vault", t("set.folderVault"))
           .addOption("note", t("set.folderNote"))
           .setValue(p.settings.folder)
-          .onChange(async (v) => {
-            p.settings.folder = v;
-            await p.saveSettings();
-          })
+          .onChange((v) => save("folder", v))
       );
     new Setting(el)
       .setName(t("set.resume"))
       .setDesc(t("set.resumeDesc"))
-      .addToggle((x) =>
-        x.setValue(p.settings.resume).onChange(async (v) => {
-          p.settings.resume = v;
-          await p.saveSettings();
-        })
-      );
-    new Setting(el)
-      .setName(t("set.ribbon"))
-      .setDesc(t("set.ribbonDesc"))
-      .addToggle((x) =>
-        x.setValue(p.settings.ribbon).onChange(async (v) => {
-          p.settings.ribbon = v;
-          await p.saveSettings();
-          p.syncRibbon();
-        })
-      );
+      .addToggle((x) => x.setValue(p.settings.resume).onChange((v) => save("resume", v)));
     new Setting(el)
       .setName(t("set.prepare"))
       .setDesc(t("set.prepareDesc"))
@@ -326,13 +245,22 @@ class ClaudeSettings extends PluginSettingTab {
 module.exports = class EcuClaude extends Plugin {
   async onload() {
     this.settings = Object.assign({}, DEFAULTS, await this.loadData());
-    uiLang = resolveUiLang(this.settings.uiLang);
+    setUiLang(this.settings.uiLang);
     this.found = null;
     this.ribbonEl = null;
+    this.registerView(VIEW_CHAT, (leaf) => new ChatView(leaf, this));
     this.syncRibbon();
 
     this.addCommand({ id: "open", name: t("cmd.open"), callback: () => this.open() });
-    this.addCommand({ id: "new-session", name: t("cmd.new"), callback: () => this.open({ fresh: true }) });
+    this.addCommand({
+      id: "new-session",
+      name: t("cmd.new"),
+      callback: async () => {
+        if (this.mode() !== "api") return this.open({ fresh: true });
+        const view = await this.openChat();
+        if (view) view.reset();
+      },
+    });
     this.addCommand({
       id: "ask-note",
       name: t("cmd.askNote"),
@@ -513,8 +441,53 @@ module.exports = class EcuClaude extends Plugin {
     });
   }
 
+  mode() {
+    return Platform.isDesktopApp ? this.settings.mode : "api";
+  }
+
+  apiKey() {
+    const id = this.settings.apiKeySecret;
+    const store = this.app.secretStorage;
+    if (!id || !store) return "";
+    try {
+      return store.getSecret(id) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  openSettings() {
+    this.app.setting.open();
+    this.app.setting.openTabById(this.manifest.id);
+  }
+
+  chatViews() {
+    return this.app.workspace.getLeavesOfType(VIEW_CHAT).map((l) => l.view).filter((v) => v instanceof ChatView);
+  }
+
+  refreshChats() {
+    for (const v of this.chatViews()) {
+      v.refreshHead();
+      v.renderEmpty();
+    }
+  }
+
+  async openChat() {
+    const ws = this.app.workspace;
+    let leaf = ws.getLeavesOfType(VIEW_CHAT)[0];
+    if (!leaf) {
+      leaf = ws.getRightLeaf(false);
+      if (!leaf) return null;
+      await leaf.setViewState({ type: VIEW_CHAT, active: true });
+    }
+    if (leaf.loadIfDeferred) await leaf.loadIfDeferred();
+    await ws.revealLeaf(leaf);
+    return leaf.view instanceof ChatView ? leaf.view : null;
+  }
+
   async open(opts) {
     opts = opts || {};
+    if (this.mode() === "api") return this.openChat();
     const term = this.terminal();
     if (!term) return null;
     const existing = term.api.toolLeaf(TOOL_ID);
@@ -568,6 +541,11 @@ module.exports = class EcuClaude extends Plugin {
 
   async ask(file, range) {
     if (!file) return new Notice(t("notice.noFile"));
+    if (this.mode() === "api") {
+      const view = await this.openChat();
+      if (view) view.attach(file, range);
+      return;
+    }
     const term = this.terminal();
     if (!term) return;
     await this.saveOpenNotes();

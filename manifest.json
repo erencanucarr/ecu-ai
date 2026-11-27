@@ -2,9 +2,9 @@
   "id": "ecu-claude",
   "name": "ecu-claude",
   "version": "1.0.0",
-  "minAppVersion": "1.7.2",
-  "description": "Open Claude Code next to your notes with one click, and ask it about the current note or selection.",
+  "minAppVersion": "1.11.4",
+  "description": "Open Claude Code next to your notes, or chat with Claude using your API key, and ask about the current note or selection.",
   "author": "Eren Can Ucar",
   "authorUrl": "https://github.com/erencanucarr",
-  "isDesktopOnly": true
+  "isDesktopOnly": false
 }

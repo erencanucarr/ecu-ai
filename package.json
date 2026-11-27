@@ -1,0 +1,16 @@
+{
+  "name": "ecu-claude",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open Claude Code next to your notes, or chat with Claude using your API key.",
+  "license": "MIT",
+  "author": "Eren Can Ucar",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "test": "node test/tools.mjs"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "esbuild": "0.28.2"
+  }
+}
