@@ -129,7 +129,9 @@ of them.
 ## Install
 
 1. From the [latest release](https://github.com/erencanucarr/ecu-ai/releases/latest), download
-   `main.js`, `manifest.json` and `styles.css` into `<your vault>/.obsidian/plugins/ecu-ai/`.
+   `main.js`, `manifest.json` and `styles.css` into `<your vault>/.obsidian/plugins/ecu-claude/`.
+   (The plugin started out as ecu-claude, and Obsidian keeps a plugin's ID for good, so the folder
+   keeps that name.)
 2. Enable **ecu-ai** under **Settings > Community plugins**.
 3. Install at least one agent CLI, for example Claude Code:
 

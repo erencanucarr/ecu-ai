@@ -532,7 +532,7 @@ module.exports = class EcuAi extends Plugin {
   }
 
   pluginDir() {
-    return node("path").join(this.vaultPath(), this.manifest.dir || ".obsidian/plugins/ecu-ai");
+    return node("path").join(this.vaultPath(), this.manifest.dir || ".obsidian/plugins/" + this.manifest.id);
   }
 
   workDir() {

@@ -1,6 +1,6 @@
 {
   "name": "ecu-ai",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Run Claude Code, Codex, Gemini CLI and other AI agents in a sidebar terminal, or chat with Claude using an API key.",
   "license": "MIT",
