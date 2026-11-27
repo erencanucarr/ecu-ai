@@ -1,5 +1,5 @@
 import esbuild from "esbuild";
-import { copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 
 // The SDK's browser build swaps its Node helpers (used only to read local
@@ -25,4 +25,5 @@ await esbuild.build({
   legalComments: "eof",
   plugins: [noNodeShims],
 });
-copyFileSync("src/styles.css", "styles.css");
+const xtermCss = readFileSync("node_modules/@xterm/xterm/css/xterm.css", "utf8");
+writeFileSync("styles.css", readFileSync("src/styles.css", "utf8") + "\n" + xtermCss);

@@ -4,7 +4,7 @@ import { ItemView, MarkdownRenderer, MarkdownView, Modal, Notice, TFile, setIcon
 import { t } from "./i18n";
 import { VaultTools, ToolError, checkInput } from "./vault-tools";
 
-export const VIEW_CHAT = "ecu-claude-chat";
+export const VIEW_CHAT = "ecu-ai-chat";
 export const MODELS = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5" },
   { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" },
@@ -13,7 +13,7 @@ export const MODELS = [
 const NO_FALLBACK = new Set(["claude-haiku-5-5"]);
 
 const SYSTEM = [
-  "You are Claude, helping the user with the notes in their Obsidian vault through the ecu-claude plugin.",
+  "You are Claude, helping the user with the notes in their Obsidian vault through the ecu-ai plugin.",
   "You can list, search and read files in the vault, and create and edit notes. Every change you make is shown to the user, who may allow or decline it.",
   "",
   "How to work:",
@@ -39,10 +39,10 @@ class ApproveModal extends Modal {
     const { req } = this;
     this.titleEl.setText(t("approve.title"));
     const el = this.contentEl;
-    el.addClass("ecl-approve");
-    el.createDiv({ cls: "ecl-approve-what", text: t("approve." + req.kind, { path: req.path }) });
-    if (req.before != null) el.createEl("pre", { cls: "ecl-diff ecl-diff-old", text: req.before });
-    if (req.after != null) el.createEl("pre", { cls: "ecl-diff ecl-diff-new", text: req.after });
+    el.addClass("eai-approve");
+    el.createDiv({ cls: "eai-approve-what", text: t("approve." + req.kind, { path: req.path }) });
+    if (req.before != null) el.createEl("pre", { cls: "eai-diff eai-diff-old", text: req.before });
+    if (req.after != null) el.createEl("pre", { cls: "eai-diff eai-diff-new", text: req.after });
     const row = el.createDiv({ cls: "modal-button-container" });
     const answer = (ok, all) => {
       this.answered = true;
@@ -89,25 +89,25 @@ export class ChatView extends ItemView {
   async onOpen() {
     const root = this.contentEl;
     root.empty();
-    root.addClass("ecl-chat");
-    const head = root.createDiv({ cls: "ecl-chat-head" });
-    this.modelEl = head.createDiv({ cls: "ecl-chat-model" });
+    root.addClass("eai-chat");
+    const head = root.createDiv({ cls: "eai-chat-head" });
+    this.modelEl = head.createDiv({ cls: "eai-chat-model" });
     const newBtn = head.createDiv({ cls: "clickable-icon", attr: { "aria-label": t("chat.new") } });
     setIcon(newBtn, "square-pen");
     newBtn.addEventListener("click", () => this.reset());
-    this.listEl = root.createDiv({ cls: "ecl-chat-list" });
-    const compose = root.createDiv({ cls: "ecl-chat-compose" });
-    this.chipEl = compose.createDiv({ cls: "ecl-chat-chips" });
-    this.input = compose.createEl("textarea", { cls: "ecl-chat-input", attr: { rows: "3", placeholder: t("chat.placeholder") } });
+    this.listEl = root.createDiv({ cls: "eai-chat-list" });
+    const compose = root.createDiv({ cls: "eai-chat-compose" });
+    this.chipEl = compose.createDiv({ cls: "eai-chat-chips" });
+    this.input = compose.createEl("textarea", { cls: "eai-chat-input", attr: { rows: "3", placeholder: t("chat.placeholder") } });
     this.input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         this.send();
       }
     });
-    const row = compose.createDiv({ cls: "ecl-chat-row" });
-    this.usageEl = row.createDiv({ cls: "ecl-chat-usage" });
-    this.sendBtn = row.createEl("button", { cls: "mod-cta ecl-chat-send", text: t("chat.send") });
+    const row = compose.createDiv({ cls: "eai-chat-row" });
+    this.usageEl = row.createDiv({ cls: "eai-chat-usage" });
+    this.sendBtn = row.createEl("button", { cls: "mod-cta eai-chat-send", text: t("chat.send") });
     this.sendBtn.addEventListener("click", () => (this.busy ? this.stop() : this.send()));
     this.refreshHead();
     this.renderEmpty();
@@ -125,7 +125,7 @@ export class ChatView extends ItemView {
   renderEmpty() {
     if (this.history.length) return;
     this.listEl.empty();
-    const box = this.listEl.createDiv({ cls: "ecl-chat-empty" });
+    const box = this.listEl.createDiv({ cls: "eai-chat-empty" });
     if (!this.plugin.apiKey()) {
       box.createDiv({ text: t("chat.noKey") });
       box.createEl("button", { text: t("chat.openSettings") }).addEventListener("click", () => this.plugin.openSettings());
@@ -154,13 +154,13 @@ export class ChatView extends ItemView {
     this.chipEl.empty();
     const a = this.attachment;
     if (!a) return;
-    const chip = this.chipEl.createDiv({ cls: "ecl-chip" });
-    const icon = chip.createSpan({ cls: "ecl-chip-icon" });
+    const chip = this.chipEl.createDiv({ cls: "eai-chip" });
+    const icon = chip.createSpan({ cls: "eai-chip-icon" });
     setIcon(icon, a.folder ? "folder" : "file-text");
     let label = a.path;
     if (a.range) label += a.range.to > a.range.from ? ` · ${a.range.from}-${a.range.to}` : ` · ${a.range.from}`;
     chip.createSpan({ text: label });
-    const x = chip.createSpan({ cls: "ecl-chip-x clickable-icon", attr: { "aria-label": t("chat.remove") } });
+    const x = chip.createSpan({ cls: "eai-chip-x clickable-icon", attr: { "aria-label": t("chat.remove") } });
     setIcon(x, "x");
     x.addEventListener("click", () => {
       this.attachment = null;
@@ -186,7 +186,7 @@ export class ChatView extends ItemView {
   }
 
   bubble(role) {
-    const el = this.listEl.createDiv({ cls: "ecl-msg ecl-msg-" + role });
+    const el = this.listEl.createDiv({ cls: "eai-msg eai-msg-" + role });
     return el;
   }
 
@@ -311,8 +311,8 @@ export class ChatView extends ItemView {
     if (att) blocks.push({ type: "text", text: att });
     blocks.push({ type: "text", text });
     const userEl = this.bubble("user");
-    if (this.attachment) userEl.createDiv({ cls: "ecl-msg-att", text: this.attachment.path });
-    userEl.createDiv({ cls: "ecl-msg-text", text });
+    if (this.attachment) userEl.createDiv({ cls: "eai-msg-att", text: this.attachment.path });
+    userEl.createDiv({ cls: "eai-msg-text", text });
     const before = this.history.slice();
     this.history.push({ role: "user", content: blocks });
     const savedInput = this.input.value;
@@ -339,7 +339,7 @@ export class ChatView extends ItemView {
       timer: null,
       activity: (label) => {
         turn.current = null;
-        const line = el.createDiv({ cls: "ecl-tool", text: label });
+        const line = el.createDiv({ cls: "eai-tool", text: label });
         this.scrollDown();
         return line;
       },
@@ -348,7 +348,7 @@ export class ChatView extends ItemView {
   }
 
   segment(turn) {
-    const seg = { el: turn.el.createDiv({ cls: "ecl-msg-md markdown-rendered" }), text: "" };
+    const seg = { el: turn.el.createDiv({ cls: "eai-msg-md markdown-rendered" }), text: "" };
     turn.segments.push(seg);
     turn.current = seg;
     return seg;
@@ -371,9 +371,9 @@ export class ChatView extends ItemView {
 
   finishTurn(turn, note) {
     const full = turn.segments.map((s) => s.text).join("\n\n").trim();
-    if (note) turn.el.createDiv({ cls: "ecl-note", text: note });
+    if (note) turn.el.createDiv({ cls: "eai-note", text: note });
     if (!full) return;
-    const bar = turn.el.createDiv({ cls: "ecl-msg-actions" });
+    const bar = turn.el.createDiv({ cls: "eai-msg-actions" });
     const copy = bar.createEl("button", { cls: "clickable-icon", attr: { "aria-label": t("chat.copy") } });
     setIcon(copy, "copy");
     copy.addEventListener("click", async () => {

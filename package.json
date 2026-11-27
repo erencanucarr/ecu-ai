@@ -1,16 +1,21 @@
 {
-  "name": "ecu-claude",
-  "version": "1.0.1",
+  "name": "ecu-ai",
+  "version": "2.0.0",
   "private": true,
-  "description": "Open Claude Code next to your notes, or chat with Claude using your API key.",
+  "description": "Run Claude Code, Codex, Gemini CLI and other AI agents in a sidebar terminal, or chat with Claude using an API key.",
   "license": "MIT",
   "author": "Eren Can Ucar",
   "scripts": {
     "build": "node esbuild.config.mjs",
-    "test": "node test/tools.mjs"
+    "test": "node test/tools.mjs && node test/agents.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "1.8.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/addon-web-links": "0.12.0",
+    "@xterm/xterm": "6.0.0",
     "esbuild": "0.28.2"
   }
 }
