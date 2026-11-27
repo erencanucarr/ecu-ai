@@ -18,6 +18,14 @@ const STRINGS = {
     "notice.oldTerminal": "ecu-claude needs ecu-terminal 2.4 or newer. Update ecu-terminal and reload Obsidian.",
     "notice.sendFailed": "Couldn't reach the Claude Code pane.",
     "notice.noFile": "Open a note first.",
+    "notice.busy": "Claude is waiting for an answer in its pane, so nothing was typed. The reference is on the clipboard; paste it when Claude is ready.",
+    "cmd.prepare": "Prepare this vault for Claude Code",
+    "prepare.done": "Created {files}.",
+    "prepare.skipped": "Already there, left as is: {files}.",
+    "prepare.failed": "Couldn't write {file}: {error}",
+    "set.prepare": "Prepare the vault",
+    "set.prepareDesc": "Adds a CLAUDE.md with the vault's conventions (wikilinks, frontmatter, code blocks) and a rule that stops Claude from editing .obsidian. Existing files are never overwritten.",
+    "set.prepareBtn": "Prepare",
     "install.title": "Claude Code isn't installed",
     "install.text": "ecu-claude starts the `{cmd}` command in a terminal, but it wasn't found on this computer. Install Claude Code, sign in once by running `claude` in a terminal, then click Open again.",
     "install.mac": "macOS, Linux, WSL",
@@ -69,6 +77,14 @@ const STRINGS = {
     "notice.oldTerminal": "ecu-claude için ecu-terminal 2.4 ya da üstü gerekiyor. ecu-terminal'i güncelleyip Obsidian'ı yeniden yükle.",
     "notice.sendFailed": "Claude Code bölmesine ulaşılamadı.",
     "notice.noFile": "Önce bir not aç.",
+    "notice.busy": "Claude bölmesinde bir soruya cevap bekliyor, o yüzden bir şey yazılmadı. Referans panoya kopyalandı; Claude hazır olunca yapıştır.",
+    "cmd.prepare": "Bu kasayı Claude Code'a hazırla",
+    "prepare.done": "Oluşturuldu: {files}.",
+    "prepare.skipped": "Zaten var, dokunulmadı: {files}.",
+    "prepare.failed": "{file} yazılamadı: {error}",
+    "set.prepare": "Kasayı hazırla",
+    "set.prepareDesc": "Kasanın kurallarını (wikilink, frontmatter, kod blokları) anlatan bir CLAUDE.md ve Claude'un .obsidian'ı düzenlemesini engelleyen bir kural ekler. Var olan dosyaların üzerine asla yazmaz.",
+    "set.prepareBtn": "Hazırla",
     "install.title": "Claude Code kurulu değil",
     "install.text": "ecu-claude terminalde `{cmd}` komutunu başlatıyor ama bu bilgisayarda bulunamadı. Claude Code'u kur, bir terminalde `claude` çalıştırıp bir kez giriş yap, sonra Aç'a tekrar tıkla.",
     "install.mac": "macOS, Linux, WSL",
@@ -129,6 +145,23 @@ const INSTALL = {
   win: "irm https://claude.ai/install.ps1 | iex",
   npm: "npm install -g @anthropic-ai/claude-code",
 };
+const CLAUDE_MD = [
+  "# Obsidian vault",
+  "",
+  "This folder is an Obsidian vault. Notes are Markdown files and Obsidian may have them open while you work.",
+  "",
+  "- Link notes with wikilinks: [[Note name]], [[Note name#Heading]] or [[Note name|label]]. When you rename or move a note, update the links that point to it.",
+  "- Keep the YAML frontmatter at the top of a note intact unless you're asked to change it.",
+  "- Put code in fenced blocks with a language tag, for example ```bash, ```yaml or ```python.",
+  "- Edit notes in place. Don't create copies or new notes unless asked.",
+  "- Write in the language the note is written in.",
+  "- Don't change anything in .obsidian/; that is Obsidian's own configuration and plugins.",
+  "- Leave attachments (images, PDFs) where they are unless asked to move them.",
+  "",
+].join("\n");
+const CLAUDE_SETTINGS = JSON.stringify({ permissions: { deny: ["Edit(/.obsidian/**)"] } }, null, 2) + "\n";
+const DIALOG_RE = /(Choose the text style|Do you trust|trust the files|Select login method|login method|Press Enter to continue|Do you want to (proceed|make this edit|create|allow|run)|Yes, proceed|Esc to cancel|❯\s*(\d+\.|✔))/i;
+
 const DEFAULTS = { uiLang: "auto", command: "claude", args: "", place: "right", folder: "vault", resume: true, ribbon: true };
 
 function shQuote(s) {
@@ -273,6 +306,10 @@ class ClaudeSettings extends PluginSettingTab {
           p.syncRibbon();
         })
       );
+    new Setting(el)
+      .setName(t("set.prepare"))
+      .setDesc(t("set.prepareDesc"))
+      .addButton((b) => b.setButtonText(t("set.prepareBtn")).onClick(() => p.prepareVault()));
     const check = new Setting(el).setName(t("set.check")).setDesc(t("set.checkDesc"));
     check.addButton((b) =>
       b.setButtonText(t("set.checkBtn")).onClick(async () => {
@@ -343,7 +380,55 @@ module.exports = class EcuClaude extends Plugin {
       })
     );
 
+    this.addCommand({ id: "prepare-vault", name: t("cmd.prepare"), callback: () => this.prepareVault() });
+
     this.addSettingTab(new ClaudeSettings(this.app, this));
+  }
+
+  async prepareVault() {
+    const a = this.app.vault.adapter;
+    const made = [];
+    const kept = [];
+    const put = async (path, body) => {
+      try {
+        if (await a.exists(path)) return kept.push(path);
+        const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+        if (dir && !(await a.exists(dir))) await a.mkdir(dir);
+        await a.write(path, body);
+        made.push(path);
+      } catch (e) {
+        new Notice(t("prepare.failed", { file: path, error: e && e.message ? e.message : e }));
+      }
+    };
+    await put("CLAUDE.md", CLAUDE_MD);
+    await put(".claude/settings.json", CLAUDE_SETTINGS);
+    if (made.length) new Notice(t("prepare.done", { files: made.join(", ") }));
+    if (kept.length) new Notice(t("prepare.skipped", { files: kept.join(", ") }), 8000);
+  }
+
+  async saveOpenNotes() {
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const v = leaf.view;
+      try {
+        if (v && v.file && typeof v.save === "function") await v.save();
+      } catch (e) {
+      }
+    }
+  }
+
+  async waitReady(term, ms) {
+    const until = Date.now() + ms;
+    const sleep = (n) => new Promise((r) => window.setTimeout(r, n));
+    while (Date.now() < until) {
+      const st = term.api.toolText ? term.api.toolText(TOOL_ID, 30) : null;
+      if (st && st.commandSentMs >= 0 && !st.running) return false;
+      if (st && st.running && st.commandSentMs > 1500 && st.idleMs > 600) {
+        const tail = st.text.split("\n").slice(-25).join("\n");
+        if (!DIALOG_RE.test(tail)) return true;
+      }
+      await sleep(200);
+    }
+    return false;
   }
 
   onunload() {
@@ -483,11 +568,23 @@ module.exports = class EcuClaude extends Plugin {
 
   async ask(file, range) {
     if (!file) return new Notice(t("notice.noFile"));
-    const leaf = await this.open();
-    if (!leaf) return;
     const term = this.terminal();
     if (!term) return;
-    const ok = await term.api.sendToTool(TOOL_ID, this.reference(file, range), { enter: false, focus: true });
+    await this.saveOpenNotes();
+    const ref = this.reference(file, range);
+    const fresh = !term.api.toolLeaf(TOOL_ID);
+    const leaf = await this.open();
+    if (!leaf) return;
+    const ready = await this.waitReady(term, fresh ? 15000 : 2500);
+    if (!ready) {
+      try {
+        await leaf.view.containerEl.win.navigator.clipboard.writeText(ref.trim());
+      } catch (e) {
+      }
+      await term.api.openTool({ id: TOOL_ID });
+      return new Notice(t("notice.busy"), 10000);
+    }
+    const ok = await term.api.sendToTool(TOOL_ID, ref, { enter: false, focus: true });
     if (!ok) new Notice(t("notice.sendFailed"));
   }
 };

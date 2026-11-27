@@ -18,6 +18,22 @@ point it at the note or lines you're looking at.
 Claude Code works on the files in its folder, so it can read, search and edit your notes. Its own
 permission prompts still apply.
 
+## Made for editing notes safely
+
+- **Your latest text is what Claude sees.** Before a note is sent to Claude, open notes are saved, so
+  line numbers and content match what's on your screen. When Claude edits a note, Obsidian shows the
+  change right away.
+- **Nothing is typed into a question.** If Claude is showing a dialog (first-run setup, "trust this
+  folder", or a permission prompt like "Do you want to make this edit?"), ecu-claude doesn't type
+  into it. The reference goes to the clipboard instead, so you can paste it when Claude is ready.
+- **Prepare the vault** (command or button in settings) adds two files, and never overwrites
+  existing ones:
+  - `CLAUDE.md`, which tells Claude this is an Obsidian vault: use `[[wikilinks]]` and keep them
+    working, keep frontmatter, put code in fenced blocks with a language, edit in place, write in the
+    note's language.
+  - `.claude/settings.json` with the rule `Edit(/.obsidian/**)` denied, so Claude can't change
+    Obsidian's settings or plugins. This applies when Claude runs in the vault folder (the default).
+
 ## Requirements
 
 - Desktop Obsidian (macOS, Windows, Linux).
