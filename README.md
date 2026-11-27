@@ -59,7 +59,7 @@ See the [installation guide](https://code.claude.com/docs/en/setup) for Windows 
 - **Open in**: a split on the right, a split below, or a new tab.
 - **Working folder**: the vault, or the current note's folder.
 - **Continue the last conversation** after a restart.
-- **Ribbon icon** on or off, and a **Check installation** button.
+- **Ribbon icon** on or off, and a button that shows the install commands. If the command isn't found when you open Claude, the install guide opens on its own.
 - Interface in English and Turkish; it follows Obsidian's language by default.
 
 Give "Open Claude" or "Ask Claude about this note" a hotkey under **Settings > Hotkeys**.

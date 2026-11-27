@@ -25,6 +25,7 @@ const CLAUDE_MD = [
   "",
 ].join("\n");
 const CLAUDE_SETTINGS = JSON.stringify({ permissions: { deny: ["Edit(/.obsidian/**)"] } }, null, 2) + "\n";
+const MISSING_RE = /(command not found|Unknown command: |is not recognized as (an internal|the name)|CommandNotFoundException|No such file or directory)/i;
 const DIALOG_RE = /(Choose the text style|Do you trust|trust the files|Select login method|login method|Press Enter to continue|Do you want to (proceed|make this edit|create|allow|run)|Yes, proceed|Esc to cancel|❯\s*(\d+\.|✔))/i;
 
 const DEFAULTS = {
@@ -47,6 +48,14 @@ function shQuote(s) {
   if (/^[\w@%+=:,./-]+$/.test(s)) return s;
   if (Platform.isWin) return '"' + s.replace(/"/g, '\\"') + '"';
   return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+function lastLines(text, n) {
+  return String(text || "")
+    .split("\n")
+    .filter((l) => l.trim())
+    .slice(-n)
+    .join("\n");
 }
 
 function mention(rel) {
@@ -82,10 +91,11 @@ class InstallModal extends Modal {
     row(t("install.npm"), INSTALL.npm);
     const foot = el.createDiv({ cls: "modal-button-container" });
     foot.createEl("a", { text: t("install.docs"), href: DOCS_URL });
-    foot.createEl("button", { text: t("install.anyway") }).addEventListener("click", () => {
-      this.close();
-      this.onAnyway();
-    });
+    if (this.onAnyway)
+      foot.createEl("button", { text: t("install.anyway") }).addEventListener("click", () => {
+        this.close();
+        this.onAnyway();
+      });
   }
   onClose() {
     this.contentEl.empty();
@@ -191,10 +201,7 @@ class ClaudeSettings extends PluginSettingTab {
         x
           .setPlaceholder("claude")
           .setValue(p.settings.command)
-          .onChange(async (v) => {
-            p.found = null;
-            await save("command", v.trim() || "claude");
-          })
+          .onChange((v) => save("command", v.trim() || "claude"))
       );
     new Setting(el)
       .setName(t("set.args"))
@@ -229,16 +236,10 @@ class ClaudeSettings extends PluginSettingTab {
       .setName(t("set.prepare"))
       .setDesc(t("set.prepareDesc"))
       .addButton((b) => b.setButtonText(t("set.prepareBtn")).onClick(() => p.prepareVault()));
-    const check = new Setting(el).setName(t("set.check")).setDesc(t("set.checkDesc"));
-    check.addButton((b) =>
-      b.setButtonText(t("set.checkBtn")).onClick(async () => {
-        b.setDisabled(true);
-        p.found = null;
-        const where = await p.findClaude();
-        check.setDesc(where ? t("set.found", { path: where }) : t("set.notFound"));
-        b.setDisabled(false);
-      })
-    );
+    new Setting(el)
+      .setName(t("set.install"))
+      .setDesc(t("set.installDesc"))
+      .addButton((b) => b.setButtonText(t("set.installBtn")).onClick(() => new InstallModal(p.app, p.settings.command || "claude").open()));
   }
 }
 
@@ -246,7 +247,6 @@ module.exports = class EcuClaude extends Plugin {
   async onload() {
     this.settings = Object.assign({}, DEFAULTS, await this.loadData());
     setUiLang(this.settings.uiLang);
-    this.found = null;
     this.ribbonEl = null;
     this.registerView(VIEW_CHAT, (leaf) => new ChatView(leaf, this));
     this.syncRibbon();
@@ -350,8 +350,9 @@ module.exports = class EcuClaude extends Plugin {
     while (Date.now() < until) {
       const st = term.api.toolText ? term.api.toolText(TOOL_ID, 30) : null;
       if (st && st.commandSentMs >= 0 && !st.running) return false;
+      if (st && st.commandSentMs >= 0 && this.missing(st)) return "missing";
       if (st && st.running && st.commandSentMs > 1500 && st.idleMs > 600) {
-        const tail = st.text.split("\n").slice(-25).join("\n");
+        const tail = lastLines(st.text, 25);
         if (!DIALOG_RE.test(tail)) return true;
       }
       await sleep(200);
@@ -409,36 +410,34 @@ module.exports = class EcuClaude extends Plugin {
     return parts.join(" ");
   }
 
-  findClaude() {
-    if (this.found !== null) return Promise.resolve(this.found);
-    const cmd = this.settings.command || "claude";
-    const cp = require("child_process");
-    return new Promise((resolve) => {
-      const done = (out) => {
-        const line = String(out || "")
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean)
-          .pop();
-        this.found = line && !/not found|no such|could not find/i.test(line) ? line : "";
-        resolve(this.found);
-      };
-      try {
-        if (Platform.isWin) {
-          cp.execFile("where.exe", [cmd], { timeout: 8000, windowsHide: true }, (err, out) => done(err ? "" : out));
-          return;
-        }
-        if (cmd.includes("/")) {
-          require("fs").access(cmd, require("fs").constants.X_OK, (err) => done(err ? "" : cmd));
-          return;
-        }
-        const term = this.app.plugins.plugins["ecu-terminal"];
-        const shell = (term && term.settings && term.settings.shellPath) || process.env.SHELL || (Platform.isMacOS ? "/bin/zsh" : "/bin/bash");
-        cp.execFile(shell, ["-ilc", "command -v " + shQuote(cmd)], { timeout: 8000, env: process.env }, (err, out) => done(err ? "" : out));
-      } catch (e) {
-        done("");
-      }
-    });
+  missing(st) {
+    if (!st || st.commandSentMs < 0 || st.commandSentMs > 20000) return false;
+    return MISSING_RE.test(lastLines(st.text, 6));
+  }
+
+  async watchMissing(term) {
+    const sleep = (n) => new Promise((r) => window.setTimeout(r, n));
+    const until = Date.now() + 15000;
+    while (Date.now() < until) {
+      await sleep(400);
+      if (!term.api.toolLeaf(TOOL_ID)) return;
+      const st = term.api.toolText(TOOL_ID, 30);
+      if (!st) return;
+      if (this.missing(st)) return this.showInstall();
+      if (st.commandSentMs > 1500 && st.idleMs > 1500) return;
+    }
+  }
+
+  showInstall() {
+    if (this.installOpen) return;
+    this.installOpen = true;
+    const m = new InstallModal(this.app, this.settings.command || "claude");
+    const close = m.onClose.bind(m);
+    m.onClose = () => {
+      this.installOpen = false;
+      close();
+    };
+    m.open();
   }
 
   mode() {
@@ -495,10 +494,6 @@ module.exports = class EcuClaude extends Plugin {
       const r = await term.api.openTool({ id: TOOL_ID });
       return r && r.leaf;
     }
-    const where = await this.findClaude();
-    if (!where) {
-      return new Promise((resolve) => new InstallModal(this.app, this.settings.command || "claude", () => resolve(this.launch(term, opts))).open());
-    }
     return this.launch(term, opts);
   }
 
@@ -518,6 +513,7 @@ module.exports = class EcuClaude extends Plugin {
       resumeCommand: this.settings.resume ? this.commandLine(true) : "",
       place: this.settings.place,
     });
+    if (r && r.leaf) this.watchMissing(term);
     return r && r.leaf;
   }
 
@@ -554,6 +550,7 @@ module.exports = class EcuClaude extends Plugin {
     const leaf = await this.open();
     if (!leaf) return;
     const ready = await this.waitReady(term, fresh ? 15000 : 2500);
+    if (ready === "missing") return this.showInstall();
     if (!ready) {
       try {
         await leaf.view.containerEl.win.navigator.clipboard.writeText(ref.trim());
